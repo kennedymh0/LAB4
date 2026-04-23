@@ -36,7 +36,7 @@ GAIN = 40
 NSAMPLES = 1024                # samples per FFT
 N_AVG = 20                      # averages per pointing
 
-SETTLE_TIME =                  # sec after move
+SETTLE_TIME = 120                 # sec after move
 
 OUTFILE = "HVC_map.npz"
 
