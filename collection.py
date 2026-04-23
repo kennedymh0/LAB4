@@ -8,7 +8,8 @@ import ugradio
 # ===============================================================
 # GLOBAL THREADING OBJECTS
 # ===============================================================
-
+sdr0queue = queue.Queue()
+sdr1queue = queue.Queue()
 observe_queue = queue.Queue()
 save_queue = queue.Queue()
 stop_event = threading.Event()
@@ -32,10 +33,10 @@ CENTER_FREQ = 1420.405751e6      # HI line
 SAMPLE_RATE = 2.4e6
 GAIN = 40
 
-NSAMPLES = 2**18                # samples per FFT
+NSAMPLES = 1024                # samples per FFT
 N_AVG = 20                      # averages per pointing
 
-SETTLE_TIME = 5                 # sec after move
+SETTLE_TIME =                  # sec after move
 
 OUTFILE = "HVC_map.npz"
 
@@ -108,7 +109,7 @@ def gal_to_altaz(l_deg, b_deg):
 
 def setup_sdr(index):
 
-    sdr = ugradio.sdr.SDR(device_index=index)
+    sdr = ugradio.sdr.SDR(direct=False,device_index=index)
 
     sdr.sample_rate = SAMPLE_RATE
     sdr.center_freq = CENTER_FREQ
@@ -120,19 +121,27 @@ def setup_sdr(index):
 # GET POWER SPECTRUM
 # ===============================================================
 
+def get_data(nobs,sdr):
+    q = []
+    for i in range(nobs):
+        x = sdr.capture_data(NSAMPLES, NBLOCKS)
+        q.append(x)
+        time.sleep(0.001)
+    return q
 def get_spectrum(sdr):
+    x = sdr.capture_data(NSAMPLES, NBLOCKS)
+    x_complex = x[...,0]+1j*x[...,1]
+    x_complex -= np.mean(x_complex)
 
-    x = sdr.capture_data(NSAMPLES)
+    spec = np.abs(np.fft.fftshift(np.fft.fft(x_complex)))**2
+    avg_spec = np.mean(spec, axis=0)
 
-    spec = np.abs(np.fft.fftshift(np.fft.fft(x)))**2
-
-    return spec
+    return avg_spec
 
 # ===============================================================
 # THREAD 1 : POINTING
 # ===============================================================
-
-def pointing_thread(scope, targets):
+def pointing_thread(scope, targets): #xxx pointing could be moved into observing thread 
 
     for l_deg, b_deg in targets:
 
@@ -152,6 +161,7 @@ def pointing_thread(scope, targets):
             scope.point(alt, az)
 
             time.sleep(SETTLE_TIME)
+            
 
             observe_queue.put({
                 "l": l_deg,
@@ -169,34 +179,47 @@ def pointing_thread(scope, targets):
 # THREAD 2 : OBSERVER
 # ===============================================================
 
-def observer_thread(sdr0, sdr1):
 def observer_thread(sdr0, sdr1, noise):
 
     while not stop_event.is_set():
 
-        target = observe_queue.get()
+        target = observe_queue.get() #xxx observe queue check here
+    
 
         noise.off()
-        time.sleep(1)
+        thread0 = threading.Thread(target=get_data, args=(2,sdr0))
+        thread1 = threading.Thread(target=get_data, args=(2,sdr1))
+        thread0.start()
+        thread1.start()
 
-        sky0 = get_spectrum(sdr0)
-        sky1 = get_spectrum(sdr1)
+        volt0 = thread0.join()
+        volt1 = thread1.join()
 
         noise.on()
-        time.sleep(1)
 
-        cal0 = get_spectrum(sdr0)
-        cal1 = get_spectrum(sdr1)
+        thread0 = threading.Thread(target=get_data, args=(2,sdr0))
+        thread1 = threading.Thread(target=get_data, args=(2,sdr1))
+        thread0.start()
+        thread1.start()
+
+        power0 = get_spectrum(volt0)
+        power1 = get_spectrum(volt1) #xxx fix get_spectrum 
+
+        vcal0 = thread0.join()
+        vcal1 = thread1.join()
 
         noise.off()
 
-        gain0 = (cal0 - sky0)/79
-        gain1 = (cal1 - sky1)/58
+        pcal0 = get_spectrum(vcal0)
+        pcal1 = get_spectrum(vcal1)
 
-        Ta0 = sky0/gain0
-        Ta1 = sky1/gain1
+        #gain0 = (cal0 - sky0)/79 (calibration can be separate)
+        #gain1 = (cal1 - sky1)/58
 
-        final_spec = 0.5*(Ta0 + Ta1)
+        #Ta0 = sky0/gain0
+        #Ta1 = sky1/gain1
+
+        #final_spec = 0.5*(Ta0 + Ta1)
 
             save_queue.put({
                 "time": time.time(),
@@ -205,7 +228,11 @@ def observer_thread(sdr0, sdr1, noise):
                 "alt": target["alt"],
                 "az": target["az"],
                 "freq": freqs,
-                "spectrum": final_spec
+                "power0": power0,
+                "power1": power1,
+                "pcal0": pcal0,
+                "pcal1": pcal1,
+                
             })
 
             print(f"Observed l={l_deg}, b={b_deg}")
@@ -258,8 +285,6 @@ def main():
     targets = build_targets()
 
     print(f"{len(targets)} targets loaded.")
-
-    scope_ =
 
     threads = [
         threading.Thread(target=pointing_thread,
