@@ -37,7 +37,7 @@ GAIN = 40
 NSAMPLES = 2048                # samples per FFT
 NBLOCKS = 1000                    # blocks per capture (was undefined)
 N_AVG_SKY = 175                      # averages per pointing
-N_AVG_CAL = 35
+N_AVG_CAL = 24
 SETTLE_TIME = 20                 # sec after move
 
 OUTFILE = "HVC_map.npz"
