@@ -30,7 +30,7 @@ STEP = 2
 LAT = 37.8732
 
 # ---- SDR settings ----
-CENTER_FREQ = 1420.405751e6      # HI line
+CENTER_FREQ = 1422.0e6      # HI line
 SAMPLE_RATE = 2.4e6
 GAIN = 40
 
