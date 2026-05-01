@@ -20,7 +20,7 @@ stop_event = threading.Event()
 # ===============================================================
 
 # ---- Map region (High Velocity Cloud project) ----
-L_MIN = 60
+L_MIN = 90
 L_MAX = 180
 B_MIN = 20
 B_MAX = 60
