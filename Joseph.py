@@ -140,46 +140,43 @@ def observer_thread(sdr0, sdr1, noise):
     # Frequencies computed once
     freqs = np.fft.fftshift(np.fft.fftfreq(NSAMPLES, d=1.0/SAMPLE_RATE)) + CENTER_FREQ
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-        while not stop_event.is_set():
-            try:
-                target = target_queue.get(timeout=1)
-            except queue.Empty:
-                continue
+    while not stop_event.is_set():
+        try:
+            target = target_queue.get(timeout=1)
+        except queue.Empty:
+            continue
 
-            try:
-                l_deg, b_deg = target["l"], target["b"]
-                print(f"[OBSERVER] Capturing pure raw data for l={l_deg}, b={b_deg}...")
-                
-                # --- Sky Capture ---
-                noise.off()
-                future_sky0 = executor.submit(capture_raw, N_AVG_SKY, sdr0)
-                future_sky1 = executor.submit(capture_raw, N_AVG_SKY, sdr1)
-                raw_sky0, raw_sky1 = future_sky0.result(), future_sky1.result()
+        try:
+            l_deg, b_deg = target["l"], target["b"]
+            print(f"[OBSERVER] Capturing pure raw data for l={l_deg}, b={b_deg}...")
+            
+            # --- Sky Capture (Sequential to prevent libusb crash) ---
+            noise.off()
+            raw_sky0 = capture_raw(N_AVG_SKY, sdr0)
+            raw_sky1 = capture_raw(N_AVG_SKY, sdr1)
 
-                # --- Cal Capture ---
-                noise.on()
-                future_cal0 = executor.submit(capture_raw, N_AVG_CAL, sdr0)
-                future_cal1 = executor.submit(capture_raw, N_AVG_CAL, sdr1)
-                raw_cal0, raw_cal1 = future_cal0.result(), future_cal1.result()
-                noise.off()
+            # --- Cal Capture (Sequential) ---
+            noise.on()
+            raw_cal0 = capture_raw(N_AVG_CAL, sdr0)
+            raw_cal1 = capture_raw(N_AVG_CAL, sdr1)
+            noise.off()
 
-                # SIGNAL TELESCOPE TO MOVE IMMEDIATELY
-                capture_done_event.set()
-                target_queue.task_done()
+            # SIGNAL TELESCOPE TO MOVE IMMEDIATELY
+            capture_done_event.set()
+            target_queue.task_done()
 
-                # Send raw data to background math thread
-                math_save_queue.put({
-                    "time": time.time(),
-                    "l": l_deg, "b": b_deg, "alt": target["alt"], "az": target["az"],
-                    "freq": freqs,
-                    "raw_sky0": raw_sky0, "raw_sky1": raw_sky1,
-                    "raw_cal0": raw_cal0, "raw_cal1": raw_cal1
-                })
+            # Send raw data to background math thread
+            math_save_queue.put({
+                "time": time.time(),
+                "l": l_deg, "b": b_deg, "alt": target["alt"], "az": target["az"],
+                "freq": freqs,
+                "raw_sky0": raw_sky0, "raw_sky1": raw_sky1,
+                "raw_cal0": raw_cal0, "raw_cal1": raw_cal1
+            })
 
-            except Exception as e:
-                print("[OBSERVER] Error:", e)
-                capture_done_event.set() # Prevent deadlock if capture fails
+        except Exception as e:
+            print("[OBSERVER] Error:", e)
+            capture_done_event.set() # Prevent deadlock if capture fails
 
 # ===============================================================
 # THREAD 3 : MATH AND WRITER (BACKGROUND)
