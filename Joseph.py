@@ -220,7 +220,7 @@ def math_writer_thread():
                      power0=power0, power1=power1, pcal0=pcal0, pcal1=pcal1)
             
             saved_count += 1
-            print(f"[WRITER] ✅ Saved observation {saved_count}: {filename}")
+            print(f"[WRITER] Saved observation {saved_count}: {filename}")
             math_save_queue.task_done()
 
         except queue.Empty:
