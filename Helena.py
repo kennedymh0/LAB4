@@ -247,7 +247,7 @@ def observer_thread(sdr0, sdr1, noise):
 
                 noise.off()
 
-                if None in (power0, power1, pcal0, pcal1):
+                if power0 is None or power1 is None or pcal0 is None or pcal1 is None:
                     print("Skipping save for l={}, b={} due to SDR failure".format(l_deg, b_deg))
                     observe_queue.task_done()
                     continue
