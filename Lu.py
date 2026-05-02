@@ -150,7 +150,7 @@ def sdr_worker(device_index, cmd_queue, res_queue, math_res_queue):
                 del massive_capture
 				if 'reshaped' in locals():
 					del reshaped
-                math_q.task_done()
+				math_q.task_done()
 
     # Start the internal math thread
     threading.Thread(target=internal_math_thread, daemon=True).start()
