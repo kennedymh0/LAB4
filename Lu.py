@@ -148,8 +148,8 @@ def sdr_worker(device_index, cmd_queue, res_queue, math_res_queue):
             finally:
                 # Strictly enforce garbage collection of the 1.2 GB object
                 del massive_capture
-		if 'reshaped' in locals():
-                    del reshaped
+				if 'reshaped' in locals():
+					del reshaped
                 math_q.task_done()
 
     # Start the internal math thread
