@@ -205,7 +205,7 @@ def watchdog_thread():
             elapsed = time.time() - activity_timestamp
             
         if elapsed > 120:
-            print(f"\n[WATCHDOG] 🚨 SYSTEM STALL DETECTED (No activity for {elapsed:.0f}s). TRIGGERING RESTART! 🚨")
+            print(f"\n[WATCHDOG] SYSTEM STALL DETECTED (No activity for {elapsed:.0f}s). TRIGGERING RESTART!")
             restart_requested.set()
             stop_event.set()  # Signals all other threads to die
             break
@@ -422,7 +422,7 @@ def run_observation_session(l_start, b_start):
         p0.join(timeout=3)
         p1.join(timeout=3)
         
-        # 🚨 HARD KILL if they are locked up 🚨
+        # HARD KILL if they are locked up
         if p0.is_alive():
             print("[SYSTEM] Force terminating SDR 0 process...")
             p0.terminate()
