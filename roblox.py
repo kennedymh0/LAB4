@@ -229,7 +229,7 @@ def sdr_worker(device_index, cmd_queue, res_queue, math_res_queue):
                 res_queue.put({"status": "error", "error": str(e)})
 
 def watchdog_thread(p0, p1):
-    TIMEOUT = 60  # seconds
+    TIMEOUT = 150  # seconds
 
     while not stop_event.is_set():
         now = time.time()
