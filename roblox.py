@@ -415,14 +415,12 @@ def collector_thread(math_res_q0, math_res_q1):
             log.info("[COLLECTOR] Waiting for math results")
             results0, results1 = {}, {}
             while len(results0) < 2 or len(results1) < 2:
-                try:
-                    msg0 = math_res_q0.get(timeout=30)
-                    if msg0["status"] == "ok":
-                        results0[msg0["type"]] = msg0["data"]
-                        msg1 = math_res_q1.get(timeout=30)
-                    if msg1["status"] == "ok":
-                        results1[msg1["type"]] = msg1["data"]
-
+                msg0 = math_res_q0.get(timeout=30)
+                if msg0["status"] == "ok":
+                    results0[msg0["type"]] = msg0["data"]
+                    msg1 = math_res_q1.get(timeout=30)
+                if msg1["status"] == "ok":
+                    results1[msg1["type"]] = msg1["data"]
         except queue.Empty:
             raise Exception("Collector timeout: missing math results")
 # ===============================================================
