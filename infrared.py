@@ -47,7 +47,7 @@ def update_activity():
 # USER SETTINGS
 # ===============================================================
 
-L_MIN, L_MAX = 90, 180
+L_MIN, L_MAX = 60, 180
 B_MIN, B_MAX = 20, 60
 STEP = 2
 LAT = 37.8732
