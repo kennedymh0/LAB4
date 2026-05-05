@@ -4,7 +4,7 @@ import re
 import numpy as np
 
 def get_missing_pointings(data_dir='HVC_new_data'):
-    L_MIN, L_MAX = 90, 180
+    L_MIN, L_MAX = 60, 180
     B_MIN, B_MAX = 20, 60
     STEP = 2
     TOLERANCE = 0.5  # degrees of tolerance for matching due to messy spacing
