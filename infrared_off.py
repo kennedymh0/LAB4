@@ -381,13 +381,13 @@ def run_observation_session(l_start, b_start, use_missing=False):
     p0.start()
     p1.start()
 
-    if use_missing:
-        from hvc_missing_off import get_missing_pointings
-        targets = get_missing_pointings()
+    if use_missing: # Kept the variable name 'use_missing' the same so we don't break main()
+        from hvc_missing_off import get_existing_pointings
+        targets = get_existing_pointings(data_dir='HVC_new_data')
         if not targets:
-            print("No missing targets found! Directory is complete.")
+            print("No targets found! Directory is empty or missing.")
             return False, current_l, current_b # Exits cleanly
-        # Update current_l and b to the first missing target for logging
+        # Update current_l and b to the first target for logging
         current_l, current_b = targets[0]
     else:
         targets = build_targets(l1=current_l, b1=current_b)
@@ -453,9 +453,9 @@ def run_observation_session(l_start, b_start, use_missing=False):
 def main():
     use_missing = False
     
-    print("Import missing points? (y/n)")
+    # Updated text to reflect the new behavior
+    print("Import existing points from HVC_new_data? (y/n)")
     ans = input().strip().lower()
-    
     if ans == "y":
         use_missing = True
         # Set dummy variables so the function doesn't crash; 
