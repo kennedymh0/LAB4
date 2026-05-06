@@ -381,13 +381,17 @@ def run_observation_session(l_start, b_start, use_missing=False):
     p0.start()
     p1.start()
 
-    if use_missing: # Kept the variable name 'use_missing' the same so we don't break main()
-        from hvc_missing_off import get_existing_pointings
-        targets = get_existing_pointings(data_dir='HVC_new_data')
+    if use_missing:
+        from hvc_missing_off import get_missing_pointings
+        # No need to pass directory names since the defaults handle it, 
+        # but you can explicitly define them here if you want:
+        targets = get_missing_pointings(source_dir='HVC_new_data', dest_dir='HVC_off2_data')
+        
         if not targets:
-            print("No targets found! Directory is empty or missing.")
+            print("No missing targets found! Directory is complete.")
             return False, current_l, current_b # Exits cleanly
-        # Update current_l and b to the first target for logging
+        
+        # Update current_l and b to the first missing target for logging
         current_l, current_b = targets[0]
     else:
         targets = build_targets(l1=current_l, b1=current_b)
