@@ -61,7 +61,7 @@ NBLOCKS = 500
 N_AVG_SKY = 150                 
 N_AVG_CAL = 12
 
-DATA_DIR = "HVC_off_data"          
+DATA_DIR = "HVC_off2_data"          
 
 # ===============================================================
 # GLOBAL MATRICES
