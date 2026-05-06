@@ -6,50 +6,42 @@ import numpy as np
 def get_missing_pointings(data_dir='HVC_off_data'):
     L_MIN, L_MAX = 60, 180
     B_MIN, B_MAX = 20, 60
-    STEP = 20
-    TOLERANCE = 0.5  # degrees of tolerance for matching due to messy spacing
+    L_STEP = 20  # Based on your example (60, 80...)
+    B_STEP = 2   # Based on your example (20, 22...)
+    TOLERANCE = 0.5 
 
     # 1. Generate the theoretical grid
     theoretical_pointings = []
-    # Loop over galactic latitude (b)
-    for b in np.arange(B_MIN, B_MAX + STEP, STEP):
-        # Calculate l step size: 2 / cos(b)
-        l_step = STEP / np.cos(np.radians(b))
-        
-        # Loop over galactic longitude (l)
-        for l in np.arange(L_MIN, L_MAX, l_step):
+    
+    # Outer loop is Latitude (b) to group all 'l's of the same 'b' together
+    # Or swap these if you want all 'b's for a single 'l' first.
+    # Based on your example: (60,20), (80,20) -> l changes, b stays same.
+    for b in np.arange(B_MIN, B_MAX + B_STEP, B_STEP):
+        for l in np.arange(L_MIN, L_MAX + L_STEP, L_STEP):
             theoretical_pointings.append((l, b))
             
     # 2. Parse existing files in the directory
     existing_pointings = []
-    # Looks for files matching the pattern HVC_l..._b...npz
     file_pattern = os.path.join(data_dir, 'HVC_l*_b*.npz')
     
-    for filepath in glob.glob(file_pattern):
-        filename = os.path.basename(filepath)
-        # Extract the l and b floating numbers from the filename using regex
-        match = re.search(r'HVC_l([0-9.]+)_b([0-9.]+)\.npz', filename)
-        if match:
-            e_l = float(match.group(1))
-            e_b = float(match.group(2))
-            existing_pointings.append((e_l, e_b))
+    if os.path.exists(data_dir):
+        for filepath in glob.glob(file_pattern):
+            filename = os.path.basename(filepath)
+            match = re.search(r'HVC_l([0-9.]+)_b([0-9.]+)\.npz', filename)
+            if match:
+                existing_pointings.append((float(match.group(1)), float(match.group(2))))
             
     # 3. Find the missing pointings
     missing_pointings = []
-    
     for t_l, t_b in theoretical_pointings:
         found = False
         for e_l, e_b in existing_pointings:
-            # Check if this theoretical point is close to an existing file
-            # using the Pythagorean distance in the l-b plane
-            distance = np.sqrt(((t_l - e_l) * np.cos(np.radians(t_b)))**2 + (t_b - e_b)**2)
-            
+            # Simple Euclidean distance since we are looking for specific grid matches
+            distance = np.sqrt((t_l - e_l)**2 + (t_b - e_b)**2)
             if distance <= TOLERANCE:
                 found = True
                 break
-                
         if not found:
-            # If no existing file was close enough, add to missing list
             missing_pointings.append((t_l, t_b))
             
     print(f"Found {len(existing_pointings)} completed pointings.")
@@ -57,7 +49,8 @@ def get_missing_pointings(data_dir='HVC_off_data'):
     
     return missing_pointings
 
-# If you want to test this script directly:
 if __name__ == "__main__":
     missing = get_missing_pointings()
-    print("First 5 missing pointings:", missing[:5])
+    # Pretty print the first few to verify order
+    for p in missing[:10]:
+        print(f"l: {p[0]:.1f}, b: {p[1]:.1f}")
