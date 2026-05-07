@@ -157,7 +157,7 @@ def sdr_worker(device_index, cmd_queue, res_queue, math_res_queue):
                 x_complex = reshaped[..., 0] + 1j * reshaped[..., 1]
                 x_complex -= np.mean(x_complex, axis=2, keepdims=True)
                 x_complex *= WINDOW
-                spec = np.abs(np.fft.fft(x_complex, axis=2), axes=2)**2
+                spec = np.abs(np.fft.fft(x_complex, axis=2))**2
                 result = spec.mean(axis=(0,1))
 
                 math_res_queue.put({"status": "ok", "type": task_type, "data": result})
@@ -315,8 +315,6 @@ def writer_thread():
             print("[WRITER] Error:", e)
 
 def collector_thread(math_res_q0, math_res_q1):
-    freqs = np.fft.fftshift(np.fft.fftfreq(NSAMPLES, d=1.0/SAMPLE_RATE)) + CENTER_FREQ
-    
     while not stop_event.is_set():
         try:
             meta = metadata_queue.get(timeout=1)
@@ -339,7 +337,6 @@ def collector_thread(math_res_q0, math_res_q1):
             math_save_queue.put({
                 "time": meta["time"],
                 "l": meta["l"], "b": meta["b"], "alt": meta["alt"], "az": meta["az"],
-                "freq": freqs,
                 "power0": results0["sky"], "power1": results1["sky"],
                 "pcal0": results0["cal"], "pcal1": results1["cal"]
             })
