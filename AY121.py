@@ -26,7 +26,6 @@ activity_timestamp = 0
 activity_lock = threading.Lock()
 current_l = 0.0
 current_b = 0.0
-WINDOW = np.hanning(NSAMPLES)
 
 def reset_globals():
     """Generates fresh queues and events for a clean restart."""
@@ -61,6 +60,8 @@ NSAMPLES = 2048
 NBLOCKS = 500                  
 N_AVG_SKY = 150                 
 N_AVG_CAL = 12
+
+WINDOW = np.hanning(NSAMPLES)
 
 DATA_DIR = "HVC_new_data"          
 
