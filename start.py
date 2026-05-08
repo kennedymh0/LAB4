@@ -145,37 +145,96 @@ def sdr_worker(device_index, cmd_queue, res_queue, math_res_queue):
 
     math_q = queue.Queue()
 
+    def process_chunk(data):
+        """
+        Converts raw SDR chunk → power spectrum
+        Fully streaming-safe (no large allocations beyond chunk)
+        """
+
+        reshaped = data.reshape(-1, NSAMPLES, 2)
+
+        x = reshaped[..., 0] + 1j * reshaped[..., 1]
+
+        x = x - np.mean(x, axis=1, keepdims=True)
+        x *= window
+
+        spec = np.fft.fft(x, axis=1)
+        spec = np.abs(spec) ** 2
+
+        return np.mean(spec, axis=0)
+
     def internal_math_thread():
+        """
+        STREAMING FFT PIPELINE:
+        - processes chunks as they arrive
+        - never stores full observation
+        - accumulates running mean spectrum
+        """
+
         while True:
             task = math_q.get()
-            if task is None: break
-            massive_capture, nobs, task_type = task
-            
+            if task is None:
+                break
+
+            nobs, task_type = task
+
             try:
-                reshaped = massive_capture.reshape(nobs, NBLOCKS, NSAMPLES, 2)
+                # accumulator for averaged spectrum
+                running_spec = None
+                total_chunks = 0
 
-                # complex conversion (vectorized)
-                x = reshaped[..., 0] + 1j * reshaped[..., 1]
+                for _ in range(nobs):
 
-                # mean removal (vectorized over blocks)
-                x = x - np.mean(x, axis=2, keepdims=True)
+                    obs_spec_sum = None
+                    obs_chunk_count = 0
 
-                # windowing (broadcasted)
-                x *= window
+                    chunks_per_obs = NBLOCKS // CHUNK_BLOCKS
+                    remainder = NBLOCKS % CHUNK_BLOCKS
 
-                # FFT over samples axis
-                spec = np.fft.fft(x, axis=2)
-                spec = np.abs(spec) ** 2
+                    # ---- stream chunks ----
+                    for _ in range(chunks_per_obs):
+                        data = sdr.capture_data(NSAMPLES, CHUNK_BLOCKS)
 
-                # average over blocks + observations in one shot
-                result = np.mean(spec, axis=(0, 1))
-                math_res_queue.put({"status": "ok", "type": task_type, "data": result})
+                        spec = process_chunk(data)
+
+                        if obs_spec_sum is None:
+                            obs_spec_sum = spec
+                        else:
+                            obs_spec_sum += spec
+
+                        obs_chunk_count += CHUNK_BLOCKS
+
+                    if remainder:
+                        data = sdr.capture_data(NSAMPLES, remainder)
+                        spec = process_chunk(data)
+                        obs_spec_sum += spec
+                        obs_chunk_count += remainder
+
+                    obs_spec_mean = obs_spec_sum / obs_chunk_count
+
+                    # accumulate across observations
+                    if running_spec is None:
+                        running_spec = obs_spec_mean
+                    else:
+                        running_spec += obs_spec_mean
+
+                    total_chunks += 1
+
+                final_result = running_spec / total_chunks
+
+                math_res_queue.put({
+                    "status": "ok",
+                    "type": task_type,
+                    "data": final_result
+                })
+
             except Exception as e:
-                math_res_queue.put({"status": "error", "error": str(e)})
+                math_res_queue.put({
+                    "status": "error",
+                    "error": str(e)
+                })
+
             finally:
-                del massive_capture
-                if 'reshaped' in locals():
-                    del reshaped
                 math_q.task_done()
 
     threading.Thread(target=internal_math_thread, daemon=True).start()
@@ -213,7 +272,7 @@ def sdr_worker(device_index, cmd_queue, res_queue, math_res_queue):
 
                 massive_capture = np.stack(blocks_list, axis=0)
                 res_queue.put({"status": "captured"})
-                math_q.put((massive_capture, nobs, task_type))
+                math_q.put((nobs, task_type))
                 del massive_capture 
 
             except Exception as e:
@@ -294,7 +353,7 @@ def observer_thread(cmd_q0, cmd_q1, res_q0, res_q1, noise):
             cmd_q0.put({"action": "capture", "nobs": N_AVG_CAL, "type": "cal"})
             cmd_q1.put({"action": "capture", "nobs": N_AVG_CAL, "type": "cal"})
 
-            if res_q0.get()["status"] == "error" or res_q1.get()["status"] == "error":
+            if res_q0.get(timeout=30)["status"] == "error" or res_q1.get(timeout=30)["status"] == "error":
                 raise Exception("Cal Capture failed in worker.")
             noise.off()
             update_activity()
@@ -352,8 +411,8 @@ def collector_thread(math_res_q0, math_res_q1):
         try:
             results0, results1 = {}, {}
             for _ in range(2): 
-                msg0 = math_res_q0.get()
-                msg1 = math_res_q1.get()
+                msg0 = math_res_q0.get(timeout=60)
+                msg1 = math_res_q1.get(timeout=60)
                 
                 if msg0["status"] == "error" or msg1["status"] == "error":
                     print("[COLLECTOR] Math thread crashed inside worker.")
@@ -508,3 +567,4 @@ def main():
 if __name__ == "__main__":
     mp.set_start_method('spawn', force=True) # Recommended for robust SDR multiprocessing
     main()
+
