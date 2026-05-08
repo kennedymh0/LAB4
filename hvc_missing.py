@@ -27,6 +27,11 @@ def get_missing_pointings(data_dir='HVC_new_data'):
             
             # Round slightly to group tiny floating point variations together
             b_key = round(e_b, 1) 
+            
+            # Skip odd numbered b values
+            if b_key % 2 != 0:
+                continue
+                
             b_tracks[b_key].append(e_l)
             
     # 2. Add empty lists for any theoretical latitudes you completely missed
@@ -79,7 +84,35 @@ def get_missing_pointings(data_dir='HVC_new_data'):
                         missing_pointings.append((round(gp, 2), b))
                         
     # Sort the final list by latitude, then longitude so the telescope sweeps smoothly
-    missing_pointings.sort(key=lambda x: (x[1], x[0]))
+    if not missing_pointings:
+        return []
+
+    # Helper function to calculate angular distance, correcting for l-compression
+    def angular_distance(p1, p2):
+        l1, b1 = p1
+        l2, b2 = p2
+        avg_b_rad = np.radians((b1 + b2) / 2.0)
+        # Scale delta-l by cos(b) to get true angular step size
+        dl = (l1 - l2) * np.cos(avg_b_rad)
+        db = b1 - b2
+        return np.sqrt(dl**2 + db**2)
+
+    unvisited = missing_pointings.copy()
+    optimized_pointings = []
+    
+    # Start at the target with the lowest b, then lowest l
+    current_target = min(unvisited, key=lambda x: (x[1], x[0]))
+    unvisited.remove(current_target)
+    optimized_pointings.append(current_target)
+    
+    # Keep finding the closest unvisited point until the list is empty
+    while unvisited:
+        next_target = min(unvisited, key=lambda p: angular_distance(current_target, p))
+        unvisited.remove(next_target)
+        optimized_pointings.append(next_target)
+        current_target = next_target
+        
+    missing_pointings = optimized_pointings
 
     print(f"Directory scan complete. Identified {len(missing_pointings)} missing targets.")
     
