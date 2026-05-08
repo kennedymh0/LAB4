@@ -61,6 +61,8 @@ NBLOCKS = 500
 N_AVG_SKY = 150                 
 N_AVG_CAL = 12
 
+window = np.hanning(NSAMPLES)
+
 DATA_DIR = "HVC_new_data"          
 
 # ===============================================================
@@ -144,7 +146,6 @@ def sdr_worker(device_index, cmd_queue, res_queue, math_res_queue):
     math_q = queue.Queue()
 
     def internal_math_thread():
-        window = np.hanning(NSAMPLES)
         while True:
             task = math_q.get()
             if task is None: break
@@ -301,7 +302,7 @@ def writer_thread():
             filename = os.path.join(DATA_DIR, f"HVC_l{item['l']:.1f}_b{item['b']:.1f}.npz")
             np.savez(filename,
                      time=item['time'], l=item['l'], b=item['b'],
-                     alt=item['alt'], az=item['az'], freq=item['freq'],
+                     alt=item['alt'], az=item['az'],
                      power0=item['power0'], power1=item['power1'], 
                      pcal0=item['pcal0'], pcal1=item['pcal1'])
             
@@ -316,7 +317,6 @@ def writer_thread():
             print("[WRITER] Error:", e)
 
 def collector_thread(math_res_q0, math_res_q1):
-    freqs = np.fft.fftshift(np.fft.fftfreq(NSAMPLES, d=1.0/SAMPLE_RATE)) + CENTER_FREQ
     
     while not stop_event.is_set():
         try:
@@ -340,7 +340,6 @@ def collector_thread(math_res_q0, math_res_q1):
             math_save_queue.put({
                 "time": meta["time"],
                 "l": meta["l"], "b": meta["b"], "alt": meta["alt"], "az": meta["az"],
-                "freq": freqs,
                 "power0": results0["sky"], "power1": results1["sky"],
                 "pcal0": results0["cal"], "pcal1": results1["cal"]
             })
